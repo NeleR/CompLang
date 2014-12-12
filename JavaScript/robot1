@@ -1,0 +1,62 @@
+
+//FightCode can only understand your robot
+//if its class is called Robot
+var Robot = function(robot) {
+
+};
+
+// well, we need to do something...
+// whenever our robot is idle, this method gets called.
+Robot.prototype.onIdle = function(ev) {
+    var robot;
+    robot = ev.robot;
+    robot.ahead(50);
+  	robot.rotateCannon(90);
+};
+
+// this method gets called whenever we hit another robot...
+Robot.prototype.onRobotCollision = function(ev) {
+	var robot;
+  robot = ev.robot;
+  robot.turn(75);
+  robot.back(50);
+  robot.rotateCannon(180);
+};
+
+// this method gets called whenever we hit a wall...
+Robot.prototype.onWallCollision = function(ev) {
+  var robot;
+  robot = ev.robot;
+  robot.stop();
+  robot.turn(75);
+  robot.ahead(50);
+};
+
+// yay we see another robot! time to wreak some havoc...
+Robot.prototype.onScannedRobot = function(ev) {
+    var robot;
+  	var scannedRobot;
+  
+    robot = ev.robot;
+  	scannedRobot = ev.scannedRobot;
+  
+  	robot.stop();
+  
+  	if(!(scannedRobot.parentId == robot.id)) {
+    	robot.fire(1);
+      robot.turn(scannedRobot.angle);
+      robot.ahead(50);
+  	}
+  	robot.stop();
+};
+
+// ohhh... we were hit by another robot...
+Robot.prototype.onHitByBullet = function(ev) {
+    var robot;
+    robot = ev.robot;
+  	robot.clone();
+  	robot.turn(ev.bearing); 
+  	robot.move(150,1);
+  	robot.move(100,-1);
+};
+

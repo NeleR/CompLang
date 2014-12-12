@@ -1,0 +1,370 @@
+<!DOCTYPE html>
+<html>
+<head>
+<title>FightCode - Create your robot</title>
+<link href='http://fonts.googleapis.com/css?family=Oswald:400,300,700' rel='stylesheet' type='text/css'>
+<link rel="stylesheet" href="/static/output/fightcode.min.css" type="text/css">
+</head>
+<body>
+<div class="create-robot container">
+
+<form id="robo-code-form" class="create-robot-form" method="POST">
+<input type="hidden" id="code" name="code" />
+
+<div class="row">
+<div class="span12">
+<div class="robot-info">
+<div class="robot-color">
+<div class="preview">
+<input type="hidden" id="robot-color" name="robot-color" value="#53c822" />
+<div class="robot-color-preview js-color-picker-preview">
+</div>
+</div>
+<div class="robot-color-picker-container js-color-picker">
+</div>
+</div>
+<div class="basic-info">
+<div class="robot-name">
+<textarea name="title" class="input-subtle" require="required"
+placeholder="ENTER YOUR ROBOT'S NAME"></textarea>
+</div>
+<div class="robot-public">
+<input name="public" id="public" type="checkbox"
+ checked="checked" 
+>
+<label for="public">public (this means that your robot can be forked by other users)</label>
+<div class="learn-more">
+<a href="/docs/?">View API documentation</a>
+</div>
+</div>
+</div>
+</div>
+<div class="robot-code-container">
+<div class="selector"><select id="enemy"><option value="duck">Duck</option><option value="wall">Wall</option><option value="seeker">Seeker</option></select></div>
+<div class="editor form-col"></div>
+<div class="board-container form-col"><div class="board"></div></div>
+</div>
+<div class="robot-code-error">
+<div class="title">ERROR: </div><div class="error">some very weird error with my robot is going on now</div>
+</div>
+</div>
+</div>
+<div class="buttons-bar">
+<button class="btn" id="submit-btn">SAVE ROBOT</button>
+
+</div>
+</form>
+</div>
+<script>
+document.workerURL = "/static/output/fightcode.worker.min.js";
+</script>
+
+<script src="/static/output/fightcode.thirdParty.min.js"></script>
+<script src="/static/output/fightcode.engine.min.js"></script>
+<script src="/static/output/fightcode.animation.min.js"></script>
+<script src="/static/output/fightcode.webApp.min.js"></script>
+
+
+
+    <div id="default-code">
+        <pre>
+            <code>//FightCode can only understand your robot
+//if its class is called Robot
+var Robot = function(robot) {
+
+};
+
+Robot.prototype.onIdle = function(ev) {
+    var robot = ev.robot;
+    robot.ahead(100);
+    robot.rotateCannon(360);
+    robot.back(100);
+    robot.rotateCannon(360);
+
+};
+
+Robot.prototype.onScannedRobot = function(ev) {
+    var robot = ev.robot;
+    robot.fire();
+
+};</code>
+        </pre>
+    </div>
+
+    <script type="robot/script" id="duck-code">
+    var Robot = function(robot) {
+    };
+
+    Robot.prototype.onIdle = function(ev) {
+        var robot = ev.robot;
+        robot.ahead(10);
+        robot.back(10);
+        robot.turn(90);
+    };
+    </script>
+
+    <script type="robot/script" id="wall-code">
+    var Robot = function(robot) {
+        robot.turnLeft(robot.angle % 90);
+        robot.turnGunRight(90);
+        robot.clone();
+    };
+
+    Robot.prototype.onIdle = function(ev) {
+        var robot = ev.robot;
+        robot.ahead(1);
+    };
+
+    Robot.prototype.onWallCollision = function(ev) {
+        var robot = ev.robot;
+        robot.turn(ev.bearing + 90);
+    };
+
+    Robot.prototype.onScannedRobot = function(ev) {
+        var rb = ev.robot, scanned = ev.scannedRobot;
+
+        if (scanned.id == rb.parentId ||
+            scanned.parentId == rb.id) {
+            return;
+        }
+
+        rb.fire();
+    };
+
+    Robot.prototype.onRobotCollision = function(ev) {
+        var robot = ev.robot, collidedRobot = ev.collidedRobot;
+        if (!ev.myFault) {
+            return;
+        }
+
+        if (ev.bearing > -90 && ev.bearing < 90) {
+            robot.back(100);
+        } else {
+            robot.ahead(100);
+        }
+    };
+    </script>
+
+    <script type="robot/script" id="seeker-code">
+    var Robot = function(robot) {
+        robot.clone();
+    };
+
+    Robot.prototype.onIdle = function(ev) {
+        var robot = ev.robot;
+        robot.turn(1);
+    };
+
+    Robot.prototype.onWallCollision = function(ev) {
+        var robot = ev.robot;
+        robot.turn(ev.bearing + 90);
+    };
+
+    Robot.prototype.onScannedRobot = function(ev) {
+        var rb = ev.robot, scanned = ev.scannedRobot;
+
+        if (scanned.id == rb.parentId ||
+            scanned.parentId == rb.id) {
+            return;
+        }
+
+        for (var i=0; i<5; i++) {
+            rb.fire();
+            rb.ahead(10);
+        }
+    };
+
+    Robot.prototype.onRobotCollision = function(ev) {
+        var robot = ev.robot, collidedRobot = ev.collidedRobot;
+        if (!ev.myFault) {
+            return;
+        }
+
+        if (ev.bearing > -90 && ev.bearing < 90) {
+            robot.back(100);
+        } else {
+            robot.ahead(100);
+        }
+    };
+    </script>
+
+    <script>
+        var container = $('.board-container');
+        var currentCode = null,
+            currentArena = null,
+            codeMirror = null;
+        var editor = $('.editor')[0];
+        var enemySelector = $('#enemy');
+
+        var errorContainer = $('.robot-code-error');
+        var errorMsg = errorContainer.find('.error');
+
+        var startFight = function(code) {
+            var color = $('.js-color-picker').spectrum('get').toHex();
+
+            if (!code) {
+                code = currentCode;
+            }
+            if (!code) {
+                return;
+            }
+            currentCode = code;
+
+            if (currentArena) {
+                currentArena.stop();
+            }
+
+            var player = {
+                name: "player",
+                code: '"use strict";' + code,
+                color: "#" + color
+            };
+
+            var enemy = enemySelector.val();
+            var enemyCode = $('#' + enemy + '-code').html();
+            var enemy = {
+                name: enemy,
+                code: '"use strict";' + enemyCode,
+                color: "#0098ff"
+            };
+
+            var options = {
+                maxRounds: 10000,
+                boardSize: {
+                    width: container.width(),
+                    height: container.height()
+                },
+                streaming: true
+            };
+
+           currentArena = new FightArena(container, [player, enemy], null, function(error) {
+               errorMsg.html(error + ' <div>Maybe you are using global variables? Your code is run under <a href="https://developer.mozilla.org/en-US/docs/JavaScript/Reference/Functions_and_function_scope/Strict_mode" target="_blank">Strict Mode</a>.</div>');
+                errorContainer.addClass('show');
+                $(editor).addClass('error');
+            }, options);
+        };
+
+        var updatePreview = function() {
+            var code = codeMirror.getValue();
+            $('#code').val(code);
+            var error = null;
+            $(editor).removeClass('error');
+            errorContainer.removeClass('show');
+            try {
+                var func = new Function(code);
+            } catch(exception) {
+                error = exception;
+                console.log(error);
+
+                errorMsg.html(error.toString());
+                errorContainer.addClass('show');
+                $(editor).addClass('error');
+            }
+            if (!error) {
+                startFight(code);
+            }
+        };
+
+        enemySelector.bind('change', function(ev) {
+            updatePreview();
+        });
+
+        (function colorPicker() {
+            var hiddenColor = $('#robot-color');
+
+            var createUpdatePreviewHandler = function(preview) {
+                return function(color) {
+                    hiddenColor.val("#" + color.toHex());
+                    preview.css(preview.data('color-picker-property') || 'background-color', color.toHexString());
+                    updatePreview();
+                }
+            };
+
+            $('.js-color-picker').each(function(i, el) {
+                el = $(el);
+                var preview = $(el.data('color-picker-preview') || '.js-color-picker-preview'),
+                color = '#53c822';
+if (color === '') {
+color = '#' + Math.floor(Math.random() * Math.pow(2, 24)).toString(16);
+}
+hiddenColor.val(color);
+preview.css(preview.data('color-picker-property') || 'background-color', color);
+el.spectrum({
+color: color,
+flat: true,
+showInput: true,
+showInitial: false,
+showAlpha: false,
+showButtons: false,
+move: createUpdatePreviewHandler(preview),
+change: createUpdatePreviewHandler(preview)
+});
+});
+}());
+(function() {
+var board = $('.board'),
+submitButton = $('#submit-btn');
+
+var robotCodeText = '';
+
+var defaultCode = $('#default-code pre code').html();
+var code = null,
+unescapeHtml = function (text) {
+var temp = document.createElement("div");
+temp.innerHTML = text;
+var result = temp.childNodes[0].nodeValue;
+temp.removeChild(temp.firstChild);
+return result;
+};
+if (robotCodeText != "") {
+code = unescapeHtml(robotCodeText);
+} else {
+code = unescapeHtml(defaultCode);
+}
+codeMirror = CodeMirror(editor, {
+value: code,
+mode: "javascript",
+theme: 'ambiance',
+height: 500,
+tabSize: 2,
+lineNumbers: true,
+onChange: updatePreview
+});
+startFight(code);
+var nameEl = $('.robot-name textarea');
+var validate = function() {
+var codeEl = $('#code');
+var editorEl = $('.robot-code-container .editor');
+var isValid = true;
+if (nameEl.val() == '') {
+nameEl.addClass('error');
+isValid = false;
+}
+if (editorEl.is('.error')) {
+isValid = false;
+}
+if (codeEl.val() == '') {
+editorEl.addClass('error');
+isValid = false;
+}
+return isValid;
+};
+submitButton.bind('click', function(ev) {
+$('#code').val(codeMirror.getValue());
+ev.preventDefault();
+ev.stopPropagation();
+if (validate()) {
+var form = $('#robo-code-form');
+form.submit();
+}
+});
+nameEl.bind('change', function(ev) {
+nameEl.removeClass('error');
+if (nameEl.val() == '') {
+nameEl.addClass('error');
+}
+})
+}());
+</script>
+</body>
+</html>
