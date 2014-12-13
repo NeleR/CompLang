@@ -17,22 +17,38 @@ Elm.Main.make = function (_elm) {
    $Graphics$Element = Elm.Graphics.Element.make(_elm),
    $Keyboard = Elm.Keyboard.make(_elm),
    $Signal = Elm.Signal.make(_elm),
-   $Text = Elm.Text.make(_elm);
-   var KeybInput = F3(function (a,
+   $Text = Elm.Text.make(_elm),
+   $Time = Elm.Time.make(_elm);
+   var heartbeat = $Time.every($Time.second / 50);
+   var KeybInput = F5(function (a,
    b,
-   c) {
+   c,
+   d,
+   e) {
       return {ctor: "KeybInput"
              ,_0: a
              ,_1: b
-             ,_2: c};
+             ,_2: c
+             ,_3: d
+             ,_4: e};
    });
-   var keybInput = A4($Signal.lift3,
+   var keybInput = A6($Signal.lift5,
    KeybInput,
+   A2($Signal.lift,
+   function (_) {
+      return _.x;
+   },
+   $Keyboard.arrows),
    A2($Signal.lift,
    function (_) {
       return _.y;
    },
    $Keyboard.arrows),
+   A2($Signal.lift,
+   function (_) {
+      return _.x;
+   },
+   $Keyboard.wasd),
    A2($Signal.lift,
    function (_) {
       return _.y;
@@ -55,51 +71,95 @@ Elm.Main.make = function (_elm) {
              ,_1: b
              ,_2: c};
    });
+   var proceed = function (_v0) {
+      return function () {
+         switch (_v0.ctor)
+         {case "PlayerState":
+            switch (_v0._0.ctor)
+              {case "_Tuple2":
+                 return function () {
+                      switch (_v0._1.ctor)
+                      {case "E":
+                         return A3(PlayerState,
+                           {ctor: "_Tuple2"
+                           ,_0: _v0._0._0 - 1
+                           ,_1: _v0._0._1},
+                           _v0._1,
+                           _v0._2);
+                         case "N": return A3(PlayerState,
+                           {ctor: "_Tuple2"
+                           ,_0: _v0._0._0
+                           ,_1: _v0._0._1 - 1},
+                           _v0._1,
+                           _v0._2);
+                         case "S": return A3(PlayerState,
+                           {ctor: "_Tuple2"
+                           ,_0: _v0._0._0
+                           ,_1: _v0._0._1 + 1},
+                           _v0._1,
+                           _v0._2);
+                         case "W": return A3(PlayerState,
+                           {ctor: "_Tuple2"
+                           ,_0: _v0._0._0 + 1
+                           ,_1: _v0._0._1},
+                           _v0._1,
+                           _v0._2);}
+                      _E.Case($moduleName,
+                      "between lines 98 and 117");
+                   }();}
+              break;}
+         _E.Case($moduleName,
+         "between lines 98 and 117");
+      }();
+   };
    var W = {ctor: "W"};
    var S = {ctor: "S"};
    var E = {ctor: "E"};
-   var initialPlayingState = function () {
-      var initialPlayer1 = A3(PlayerState,
-      {ctor: "_Tuple2"
-      ,_0: -1000
-      ,_1: 0},
-      E,
-      _L.fromArray([]));
-      var initialPlayer2 = A3(PlayerState,
-      {ctor: "_Tuple2"
-      ,_0: 1000
-      ,_1: 0},
-      E,
-      _L.fromArray([]));
-      return A2(Playing,
-      initialPlayer1,
-      initialPlayer2);
-   }();
-   var step = F2(function (_v0,
-   state) {
+   var changeXDir = F2(function (d,
+   _v8) {
       return function () {
-         switch (_v0.ctor)
-         {case "KeybInput":
-            return function () {
-                 switch (state.ctor)
-                 {case "Ended":
-                    return _v0._2 ? initialPlayingState : Ended;
-                    case "Playing":
-                    return _v0._2 ? initialPlayingState : A2(Playing,
-                      state._0,
-                      state._1);
-                    case "Started":
-                    return _v0._2 ? initialPlayingState : Started;}
-                 _E.Case($moduleName,
-                 "between lines 68 and 72");
-              }();}
+         switch (_v8.ctor)
+         {case "PlayerState":
+            return _U.eq(d,
+              1) ? A3(PlayerState,
+              _v8._0,
+              E,
+              _v8._2) : _U.eq(d,
+              -1) ? A3(PlayerState,
+              _v8._0,
+              W,
+              _v8._2) : A3(PlayerState,
+              _v8._0,
+              _v8._1,
+              _v8._2);}
          _E.Case($moduleName,
-         "between lines 68 and 72");
+         "between lines 86 and 88");
       }();
    });
    var N = {ctor: "N"};
-   var color2 = $Color.orange;
-   var color1 = $Color.lightBlue;
+   var changeYDir = F2(function (d,
+   _v13) {
+      return function () {
+         switch (_v13.ctor)
+         {case "PlayerState":
+            return _U.eq(d,
+              1) ? A3(PlayerState,
+              _v13._0,
+              N,
+              _v13._2) : _U.eq(d,
+              -1) ? A3(PlayerState,
+              _v13._0,
+              S,
+              _v13._2) : A3(PlayerState,
+              _v13._0,
+              _v13._1,
+              _v13._2);}
+         _E.Case($moduleName,
+         "between lines 92 and 94");
+      }();
+   });
+   var color2 = $Color.lightBlue;
+   var color1 = $Color.orange;
    var tailWidth = 2;
    var showTail = F2(function (color,
    positions) {
@@ -112,10 +172,10 @@ Elm.Main.make = function (_elm) {
    var playerH = 16;
    var playerW = 64;
    var showPlayer$ = F3(function (color,
-   _v8,
+   _v18,
    o) {
       return function () {
-         switch (_v8.ctor)
+         switch (_v18.ctor)
          {case "_Tuple2":
             return function () {
                  var fw = $Basics.toFloat(playerW);
@@ -150,8 +210,8 @@ Elm.Main.make = function (_elm) {
                  return $Graphics$Collage.rotate($Basics.degrees(degs))($Graphics$Collage.move({ctor: "_Tuple2"
                                                                                                ,_0: xOffset
                                                                                                ,_1: yOffset})($Graphics$Collage.move({ctor: "_Tuple2"
-                                                                                                                                     ,_0: _v8._0
-                                                                                                                                     ,_1: _v8._1})($Graphics$Collage.outlined($Graphics$Collage.solid(color))(A2($Graphics$Collage.rect,
+                                                                                                                                     ,_0: _v18._0
+                                                                                                                                     ,_1: _v18._1})($Graphics$Collage.outlined($Graphics$Collage.solid(color))(A2($Graphics$Collage.rect,
                  fw,
                  $Basics.toFloat(playerH))))));
               }();}
@@ -161,19 +221,64 @@ Elm.Main.make = function (_elm) {
    });
    var height = 768;
    var width = 1024;
-   var showPlayingState = F2(function (_v13,
-   _v14) {
+   var initialPlayingState = function () {
+      var position1 = width / 2 - 50 - playerW;
+      var position2 = 0 - width / 2 + 50 + playerW;
+      var initialPlayer1 = A3(PlayerState,
+      {ctor: "_Tuple2"
+      ,_0: position1
+      ,_1: 0},
+      E,
+      _L.fromArray([]));
+      var initialPlayer2 = A3(PlayerState,
+      {ctor: "_Tuple2"
+      ,_0: position2
+      ,_1: 0},
+      W,
+      _L.fromArray([]));
+      return A2(Playing,
+      initialPlayer1,
+      initialPlayer2);
+   }();
+   var step = F2(function (_v23,
+   state) {
       return function () {
-         switch (_v14.ctor)
+         switch (_v23.ctor)
+         {case "KeybInput":
+            return function () {
+                 switch (state.ctor)
+                 {case "Ended":
+                    return _v23._4 ? initialPlayingState : Ended;
+                    case "Playing":
+                    return _v23._4 ? initialPlayingState : A2(Playing,
+                      proceed(state._0),
+                      proceed(state._1));
+                    case "Started":
+                    return _v23._4 ? initialPlayingState : Started;}
+                 _E.Case($moduleName,
+                 "between lines 68 and 84");
+              }();}
+         _E.Case($moduleName,
+         "between lines 68 and 84");
+      }();
+   });
+   var gameState = A3($Signal.foldp,
+   step,
+   Started,
+   keybInput);
+   var showPlayingState = F2(function (_v33,
+   _v34) {
+      return function () {
+         switch (_v34.ctor)
          {case "PlayerState":
-            switch (_v14._0.ctor)
+            switch (_v34._0.ctor)
               {case "_Tuple2":
                  return function () {
-                      switch (_v13.ctor)
+                      switch (_v33.ctor)
                       {case "PlayerState":
-                         switch (_v13._0.ctor)
+                         switch (_v33._0.ctor)
                            {case "_Tuple2":
-                              return $Signal.constant(A3($Graphics$Collage.collage,
+                              return A3($Graphics$Collage.collage,
                                 width,
                                 height,
                                 _L.fromArray([A2($Graphics$Collage.filled,
@@ -181,47 +286,51 @@ Elm.Main.make = function (_elm) {
                                              A2($Graphics$Collage.rect,
                                              width,
                                              height))
-                                             ,A3(showPlayer$,
+                                             ,A2($Graphics$Collage.move,
+                                             {ctor: "_Tuple2",_0: 0,_1: 2},
+                                             A3(showPlayer$,
                                              color1,
                                              {ctor: "_Tuple2"
-                                             ,_0: _v13._0._0
-                                             ,_1: _v13._0._1},
-                                             _v13._1)
+                                             ,_0: _v33._0._0
+                                             ,_1: _v33._0._1},
+                                             _v33._1))
                                              ,A3(showPlayer$,
                                              color2,
                                              {ctor: "_Tuple2"
-                                             ,_0: _v14._0._0
-                                             ,_1: _v14._0._1},
-                                             _v14._1)
-                                             ,A2(showTail,color1,_v13._2)
+                                             ,_0: _v34._0._0
+                                             ,_1: _v34._0._1},
+                                             _v34._1)
+                                             ,A2(showTail,color1,_v33._2)
                                              ,A2(showTail,
                                              color2,
-                                             _v14._2)])));}
+                                             _v34._2)]));}
                            break;}
                       _E.Case($moduleName,
-                      "between lines 81 and 87");
+                      "between lines 131 and 137");
                    }();}
               break;}
          _E.Case($moduleName,
-         "between lines 81 and 87");
+         "between lines 131 and 137");
       }();
    });
    var showState = function (state) {
       return function () {
          switch (state.ctor)
          {case "Ended":
-            return $Signal.constant($Text.plainText("Player _ has won!"));
+            return $Text.plainText("Player _ has won!");
             case "Playing":
             return A2(showPlayingState,
               state._0,
               state._1);
             case "Started":
-            return $Signal.constant($Text.plainText("Press space to start a new game"));}
+            return $Text.plainText("Press space to start a new game");}
          _E.Case($moduleName,
          "between lines 61 and 65");
       }();
    };
-   var main = showState(Started);
+   var main = A2($Signal.lift,
+   showState,
+   gameState);
    _elm.Main.values = {_op: _op
                       ,width: width
                       ,height: height
@@ -242,9 +351,14 @@ Elm.Main.make = function (_elm) {
                       ,showPlayer$: showPlayer$
                       ,showTail: showTail
                       ,main: main
+                      ,heartbeat: heartbeat
                       ,keybInput: keybInput
                       ,showState: showState
                       ,step: step
+                      ,changeXDir: changeXDir
+                      ,changeYDir: changeYDir
+                      ,proceed: proceed
+                      ,gameState: gameState
                       ,initialPlayingState: initialPlayingState
                       ,showPlayingState: showPlayingState};
    return _elm.Main.values;
