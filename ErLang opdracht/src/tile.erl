@@ -4,27 +4,29 @@
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 -module(tile).
+-import(string, [concat/2]).
 
--export([tilemain/1]).
+-export([tilemain/1,atTheTop/2]).
 
 tilemain( Id ) ->
 	tilemain(Id, 0).
 
 tilemain( Id, Value ) ->
+	glob:registerName(glob:regformat(Id), self()),
 	tilelife(Id,Value,false).
 
 
 %%%%%%%%%%%%%%%%%
 % fill this out %
 %%%%%%%%%%%%%%%%%
-tilelife(Id,CurrentValue,Merged)->
+tilelife(Id,Value,Merged)->
 	receive
 		die ->
 			debug:debug("I, ~p, die.~n",[Id]),
 			exit(killed);
 		up ->
             debug:debug("I, ~p, go up.~n",[Id]),
-			ok;
+			up(Id,Value);
 		dn ->
 			debug:debug("I, ~p, go down.~n",[Id]),
             ok;
@@ -35,42 +37,52 @@ tilelife(Id,CurrentValue,Merged)->
 			debug:debug("I, ~p, go right.~n",[Id]),
             ok;
 		{yourValue, Repl} ->
-            debug:debug("I, ~p, send my value.~n",[Id]),
-			Repl ! {tilevalue, Id, CurrentValue, Merged};
+            debug:debug("I, ~p, send my value: ~p, ~p.~n",[Id,Value,Merged]),
+			Repl ! {tilevalue, Id, Value, Merged};
 		{setvalue, Future, NewMerged} ->
-            debug:debug("I, ~p, set my value.~n",[Id]),
-			tilelife(Id,Future,NewMerged);
+            debug:debug("I, ~p, set my value: ~p, ~p.~n",[Id,Value,Merged]),
+			tilelife(Id,Future,NewMerged)
 	end,
-	tilelife( ).
+	tilelife(Id,Value,Merged).
+	
+inBounds(Tile) when Tile < 0, Tile > 16 -> false;
+inBounds(_) -> true.
 
-up(Id,Value) ->
-    if
-        % you are either an empty tile or a tile at the top
-		Value == 0 || Id - 4 < 0 ->					
-            Id ! {setvalue,Value,false};			% keep your current value
-            Id + 4 ! up								% tell the tile below you to calculate its up movement
-        % you are not empty and not the top
-		true ->
-            Id - 4 ! {yourValue, self()};			% ask the tile above you about its value
-    end,
-    receive ->
-        {tilevalue, NId, NValue, NMerged}; ->
-            if
-				% the tile above you has the same value and is not merged yet: you can merge
-				% or the tile above you is an empty tile and is the top: you can merge
-                (NValue == Value && !NMerged)
-				|| (NValue == 0 && NId - 4 < 0) ->						
-                    NId ! {setvalue, NValue + Value, true};		% add your value to the tile above you
-					Id ! {setvalue,0,false};						% make your own tile empty
-					Id + 4 ! up										% tell the tile below you to calculate its up movement
-				% the tile above you has another value or has been merged already: you cannot merge
-				NValue != Value || NMerged ->						
-					Id ! {setvalue,Value,false};					% keep your current value
-					Id + 4 ! up										% tell the tile below you to calculate its up movement
-                % the tile above you is an empty tile and not the top: you have to ask further
-				NValue == 0 ->										
-                    NId - 4 ! {yourValue, self()};  % the responsive tile is empty, ask the next tile
-                true ->
-                    % do nothing
-            end,
-    end,
+% call this function as: atTheTop(Tile,inBounds(Tile))
+atTheTop(Tile,true) when Tile < 5 -> true;
+atTheTop(_,_) -> false.
+	
+% call this function as: propagateUp(Id,inBounds(Id + 4))
+propagateUp(Id,true) -> glob:regformat(Id + 4) ! up;
+propagateUp(_,_) -> false.
+
+up(Id,Value)->
+	noMerge(Id,Value,
+		((Value == 0) or atTheTop(Id,inBounds(Id)))),
+	glob:regformat(Id - 4) ! {yourValue, self()},
+    receive
+        {tilevalue, NId, NValue, NMerged} ->
+        	% if possible, merge with the next tile
+        	merge(Id,Value,NId,NValue,
+        		((NValue == Value) and not NMerged) or ((NValue == 0) and atTheTop(NId,inBounds(Id)))),
+        	% if needed, check the value of the next tile
+        	checkNext(Id,Value,NId-4,
+        		((NValue == 0) and inBounds(NId-4))),
+        	% if no merge is possible
+	    	noMerge(Id,Value,
+	    		((NValue /= Value) or NMerged)) 
+    end.
+    
+merge(Id,Value,NId,NValue,true) -> 
+	glob:regformat(NId) ! {setvalue, NValue + Value, true},
+	glob:regformat(Id) ! {setvalue,0,false},
+	propagateUp(Id,inBounds(Id + 4)).
+	
+checkNext(Id,Value,NextId,true) ->
+	glob:regformat(NextId) ! {yourValue, self()},
+	up(Id,Value).
+	
+noMerge(Id,Value,true) ->
+	glob:regformat(Id) ! {setvalue,Value,false},
+	propagateUp(Id,inBounds(Id + 4)).
+	
