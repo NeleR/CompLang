@@ -49,8 +49,19 @@ manageloop() ->
 		{collectedData, TupleData} ->
 			ListData = randomiseatile(TupleData),
 			gui ! {values, ListData}
+		
+			
 	end,
 	manageloop().
+
+propagationloop(Num) ->
+	receive
+		endOfPropagation ->
+			case Num of
+				3 -> 
+					 manager ! 
+				_ -> propagationloop(Num+1)
+	end.
 
 % takes a tuple of data in input and returns it in a list format
 % with two elements that were at 0 now randomised at 2

@@ -70,7 +70,7 @@ propagate(Dir,Id,Value,Merged) ->
 	PropInBounds = inBounds(nextTileToPropagate(Dir,Id)),
 	if 
 		PropInBounds -> manager:sendmessage(nextTileToPropagate(Dir,Id),Dir);
-		not PropInBounds -> debug:debug("no ~p propagation after ~p~n",[Dir,Id])
+		not PropInBounds -> manager ! endOfPropagation;
 	end,
 	tilelife(Id,Value,Merged).
 
