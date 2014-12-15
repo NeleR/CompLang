@@ -26,20 +26,16 @@ tilelife(Id,Value,Merged)->
 			exit(killed);
 		up ->
 			debug:debug("I, ~p, go up.~n",[Id]),
-			CannotGoUp = ((Value == 0) or atEdge(up,Id)),
-			if 
-				CannotGoUp -> noMerge(up,Id,Value);
-				not CannotGoUp -> checkNext(up,Id,Value,Id,0)
-			end;
+			move(up,Id,Value);
 		dn ->
 			debug:debug("I, ~p, go down.~n",[Id]),
-            ok;
+            move(dn,Id,Value);
 		lx ->
 			debug:debug("I, ~p, go left.~n",[Id]),
-            ok;
+            move(lx,Id,Value);
 		rx ->
 			debug:debug("I, ~p, go right.~n",[Id]),
-            ok;
+            move(rx,Id,Value);
 		{yourValue, Repl} ->
             debug:debug("I, ~p, send my value: ~p, ~p.~n",[Id,Value,Merged]),
 			Repl ! {tilevalue, Id, Value, Merged};
@@ -55,7 +51,7 @@ inBounds(_) -> false.
 atEdge(up,Tile) when Tile > 0, Tile < 5 -> true;
 atEdge(dn,Tile) when Tile > 12, Tile < 17 -> true;
 atEdge(lx,Tile) when (Tile == 1) or (Tile == 5) or (Tile == 9) or (Tile == 13) -> true;
-atEdge(lx,Tile) when (Tile == 4) or (Tile == 8) or (Tile == 12) or (Tile == 16) -> true;
+atEdge(rx,Tile) when (Tile == 4) or (Tile == 8) or (Tile == 12) or (Tile == 16) -> true;
 atEdge(_,_) -> false.
 
 nextTileToCheck(up,Tile) -> Tile-4;
@@ -78,7 +74,14 @@ propagate(Dir,Id,Value,Merged) ->
 	end,
 	tilelife(Id,Value,Merged).
 
-moveLoop(Dir,Id,Value,PrevId,PrevValue)->
+move(Dir,Id,Value) ->
+	CannotMove = ((Value == 0) or atEdge(Dir,Id)),
+	if 
+		CannotMove -> noMerge(Dir,Id,Value);
+		not CannotMove -> checkNext(Dir,Id,Value,Id,0)
+	end.
+
+moveLoop(Dir,Id,Value,PrevId,PrevValue) ->
     receive
         {tilevalue, NId, NValue, NMerged} ->
 			CanMerge = (((NValue == Value) and not NMerged) or ((NValue == 0) and atEdge(Dir,NId))),
@@ -95,7 +98,7 @@ moveLoop(Dir,Id,Value,PrevId,PrevValue)->
     end.
     
 merge(Dir,Id,Value,NId,NValue) -> 
-	glob:regformat(NId) ! {setvalue, NValue + Value, true},
+	glob:regformat(NId) ! {setvalue, NValue + Value, (NValue =/= 0)},
 	propagate(Dir,Id,0,false).
 	
 checkNext(Dir,Id,Value,PrevId,PrevValue) ->
