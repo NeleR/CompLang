@@ -5,10 +5,17 @@
 
 -module(manager).
 
--export([manage/0]).
+-export([manage/0, registerTile/1]).
 
 manage() ->
+	Tmp = [1,2,3,4,5,6,7,9,8,9,10,11,12,13,14,15,16],
+	lists:map(fun registerTile/1, Tmp),
+
 	manageloop().
+	
+registerTile(TileID) ->
+	T = spawn(tile,tilemain,[TileID]),
+	glob:registerName(glob:regformat(TileID), T).
 
 % when receiving the message $senddata, spawn a collector and a broadcaster for the collection of the data
 % from the tiles. Then, once the $Data is collected, inform the lifeguard and the gui

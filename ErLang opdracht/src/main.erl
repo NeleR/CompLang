@@ -16,5 +16,5 @@ play() ->
 
 playnoblaster() ->
 	P = spawn(fun manager:manage/0),
-	glob:registerName(manager,P),			
+	glob:registerName(manager,P),	
 	gui:display().	
