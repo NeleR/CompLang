@@ -6,7 +6,7 @@
 -module(tile).
 -import(string, [concat/2]).
 
--export([tilemain/1,atTheTop/2]).
+-export([tilemain/1]).
 
 tilemain( Id ) ->
 	tilemain(Id, 0).
@@ -25,8 +25,12 @@ tilelife(Id,Value,Merged)->
 			debug:debug("I, ~p, die.~n",[Id]),
 			exit(killed);
 		up ->
-            debug:debug("I, ~p, go up.~n",[Id]),
-			up(Id,Value);
+			debug:debug("I, ~p, go up.~n",[Id]),
+			CannotGoUp = ((Value == 0) or atEdge(up,Id)),
+			if 
+				CannotGoUp -> noMerge(up,Id,Value);
+				not CannotGoUp -> checkNext(up,Id,Value,Id,0)
+			end;
 		dn ->
 			debug:debug("I, ~p, go down.~n",[Id]),
             ok;
@@ -40,49 +44,64 @@ tilelife(Id,Value,Merged)->
             debug:debug("I, ~p, send my value: ~p, ~p.~n",[Id,Value,Merged]),
 			Repl ! {tilevalue, Id, Value, Merged};
 		{setvalue, Future, NewMerged} ->
-            debug:debug("I, ~p, set my value: ~p, ~p.~n",[Id,Value,Merged]),
+            debug:debug("I, ~p, set my value: ~p, ~p.~n",[Id,Future,NewMerged]),
 			tilelife(Id,Future,NewMerged)
 	end,
 	tilelife(Id,Value,Merged).
 	
-inBounds(Tile) when Tile < 0, Tile > 16 -> false;
-inBounds(_) -> true.
+inBounds(Tile) when Tile > 0, Tile < 17 -> true;
+inBounds(_) -> false.
 
-% call this function as: atTheTop(Tile,inBounds(Tile))
-atTheTop(Tile,true) when Tile < 5 -> true;
-atTheTop(_,_) -> false.
-	
-% call this function as: propagateUp(Id,inBounds(Id + 4))
-propagateUp(Id,true) -> glob:regformat(Id + 4) ! up;
-propagateUp(_,_) -> false.
+atEdge(up,Tile) when Tile > 0, Tile < 5 -> true;
+atEdge(dn,Tile) when Tile > 12, Tile < 17 -> true;
+atEdge(lx,Tile) when (Tile == 1) or (Tile == 5) or (Tile == 9) or (Tile == 13) -> true;
+atEdge(lx,Tile) when (Tile == 4) or (Tile == 8) or (Tile == 12) or (Tile == 16) -> true;
+atEdge(_,_) -> false.
 
-up(Id,Value)->
-	noMerge(Id,Value,
-		((Value == 0) or atTheTop(Id,inBounds(Id)))),
-	glob:regformat(Id - 4) ! {yourValue, self()},
+nextTileToCheck(up,Tile) -> Tile-4;
+nextTileToCheck(dn,Tile) -> Tile+4;
+nextTileToCheck(lx,Tile) -> Tile-1;
+nextTileToCheck(rx,Tile) -> Tile+1;
+nextTileToCheck(_,_) -> 0.
+
+nextTileToPropagate(up,Tile) -> Tile+4;
+nextTileToPropagate(dn,Tile) -> Tile-4;
+nextTileToPropagate(lx,Tile) -> Tile+1;
+nextTileToPropagate(rx,Tile) -> Tile-1;
+nextTileToPropagate(_,_) -> 0.
+
+propagate(Dir,Id,Value,Merged) ->
+	PropInBounds = inBounds(nextTileToPropagate(Dir,Id)),
+	if 
+		PropInBounds -> glob:regformat(nextTileToPropagate(Dir,Id)) ! Dir;
+		not PropInBounds -> debug:debug("no ~p propagation after ~p~n",[Dir,Id])
+	end,
+	tilelife(Id,Value,Merged).
+
+moveLoop(Dir,Id,Value,PrevId,PrevValue)->
     receive
         {tilevalue, NId, NValue, NMerged} ->
-        	% if possible, merge with the next tile
-        	merge(Id,Value,NId,NValue,
-        		((NValue == Value) and not NMerged) or ((NValue == 0) and atTheTop(NId,inBounds(Id)))),
-        	% if needed, check the value of the next tile
-        	checkNext(Id,Value,NId-4,
-        		((NValue == 0) and inBounds(NId-4))),
-        	% if no merge is possible
-	    	noMerge(Id,Value,
-	    		((NValue /= Value) or NMerged)) 
+			CanMerge = (((NValue == Value) and not NMerged) or ((NValue == 0) and atEdge(Dir,NId))),
+			NeedCheckNext = ((NValue == 0) and inBounds(nextTileToCheck(Dir,NId))),
+			CannotMerge = (NValue =/= Value) or NMerged,
+			CanMergeWithPrev = CannotMerge and (PrevId =/= Id),
+			
+			if
+				CanMerge -> merge(Dir,Id,Value,NId,NValue);
+				NeedCheckNext -> checkNext(Dir,Id,Value,NId,NValue);
+				CanMergeWithPrev -> merge(Dir,Id,Value,PrevId,PrevValue);
+				CannotMerge -> noMerge(Dir,Id,Value)
+			end
     end.
     
-merge(Id,Value,NId,NValue,true) -> 
+merge(Dir,Id,Value,NId,NValue) -> 
 	glob:regformat(NId) ! {setvalue, NValue + Value, true},
-	glob:regformat(Id) ! {setvalue,0,false},
-	propagateUp(Id,inBounds(Id + 4)).
+	propagate(Dir,Id,0,false).
 	
-checkNext(Id,Value,NextId,true) ->
-	glob:regformat(NextId) ! {yourValue, self()},
-	up(Id,Value).
+checkNext(Dir,Id,Value,PrevId,PrevValue) ->
+	glob:regformat(nextTileToCheck(Dir,PrevId)) ! {yourValue, self()},
+	moveLoop(Dir,Id,Value,PrevId,PrevValue).
 	
-noMerge(Id,Value,true) ->
-	glob:regformat(Id) ! {setvalue,Value,false},
-	propagateUp(Id,inBounds(Id + 4)).
+noMerge(Dir,Id,Value) ->
+	propagate(Dir,Id,Value,false).
 	
