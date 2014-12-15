@@ -5,7 +5,7 @@
 
 -module(manager).
 
--export([manage/0, registerTile/1]).
+-export([manage/0, registerTile/1, sendmessage/2]).
 
 manage() ->
 	Tmp = [1,2,3,4,5,6,7,9,8,9,10,11,12,13,14,15,16],
@@ -15,7 +15,8 @@ manage() ->
 	
 registerTile(TileID) ->
 	T = spawn(tile,tilemain,[TileID]),
-	glob:registerName(glob:regformat(TileID), T).
+	glob:registerName(glob:regformat(TileID), T),
+	debug:debug("MANAGER: register tile ~p at ~p.~n",[TileID,T]).
 
 % when receiving the message $senddata, spawn a collector and a broadcaster for the collection of the data
 % from the tiles. Then, once the $Data is collected, inform the lifeguard and the gui
@@ -23,16 +24,16 @@ manageloop() ->
 	receive
 		up ->
 			Tmp = [1,2,3,4],
-			lists:map(fun(X) -> glob:regformat(X) ! up end, Tmp);
+			lists:map(fun(X) -> sendmessage(X,up) end,Tmp);
 		dn ->
 			Tmp = [13,14,15,16],
-			lists:map(fun(X) -> glob:regformat(X) ! dn end, Tmp);
+			lists:map(fun(X) -> sendmessage(X,dn) end, Tmp);
 		lx ->
 			Tmp = [1,5,9,13],
-			lists:map(fun(X) -> glob:regformat(X) ! lx end, Tmp);
+			lists:map(fun(X) -> sendmessage(X,lx) end, Tmp);
 		rx ->
 			Tmp = [4,8,12,16],
-			lists:map(fun(X) -> glob:regformat(X) ! rx end, Tmp);
+			lists:map(fun(X) -> sendmessage(X,rx) end, Tmp);
 		sendData ->
 			Basetuple = {0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0},
 			%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -64,7 +65,7 @@ randomiseatile( Tuple )->
 			V1 = 2,
 			debug:debug("MANAGER: radomised in ~p.~n",[C1]),
 			io:format("MANAGER: radomised in ~p.~n",[C1]),
-			glob:regformat(C1) ! {setvalue, V1, false},
+			sendmessage(C1,{setvalue, V1, false}),
 			Tu = erlang:setelement(C1,Tuple,V1)
 	end,
 	erlang:tuple_to_list(Tu).
@@ -82,7 +83,7 @@ getCand( Oth , T)->
 			end
 	end.
 
-% collects 16 numbes in $T, then returns the related tuple
+% collects 16 numbers in $T, then returns the related tuple
 % $T is a tuple of length 16
 collect( N , T) ->
 	case N of
@@ -99,12 +100,18 @@ collect( N , T) ->
 broadcaster( 0, _ )->
 	ok;
 broadcaster( N, Mess ) when N < 17 -> 
+	sendmessage( N, Mess),
+	broadcaster( N-1, Mess ).
+
+sendmessage( N, Mess) when N > 0, N < 17 ->
 	try glob:regformat(N) ! Mess of
 		_ -> 
-			debug:debug("broadcasting to ~p.~n",[N]),
+			debug:debug("send to ~p.~n",[N]),
 			ok
 	catch
 		_:F -> 
-			debug:debug("BROADCASTER: cannot commmunicate to ~p. Error ~p.~n",[N,F])
-	end,
-	broadcaster( N-1, Mess ).
+			debug:debug("BROADCASTER: cannot commmunicate to ~p. Error ~p.~n",[N,F]),
+			registerTile(N),
+			sendmessage( N, Mess )
+	end.
+	

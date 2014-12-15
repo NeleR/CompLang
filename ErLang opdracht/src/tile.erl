@@ -69,7 +69,7 @@ nextTileToPropagate(_,_) -> 0.
 propagate(Dir,Id,Value,Merged) ->
 	PropInBounds = inBounds(nextTileToPropagate(Dir,Id)),
 	if 
-		PropInBounds -> glob:regformat(nextTileToPropagate(Dir,Id)) ! Dir;
+		PropInBounds -> manager:sendmessage(nextTileToPropagate(Dir,Id),Dir);
 		not PropInBounds -> debug:debug("no ~p propagation after ~p~n",[Dir,Id])
 	end,
 	tilelife(Id,Value,Merged).
@@ -98,11 +98,11 @@ moveLoop(Dir,Id,Value,PrevId,PrevValue) ->
     end.
     
 merge(Dir,Id,Value,NId,NValue) -> 
-	glob:regformat(NId) ! {setvalue, NValue + Value, (NValue =/= 0)},
+	manager:sendmessage(NId,{setvalue, NValue + Value, (NValue =/= 0)}),
 	propagate(Dir,Id,0,false).
 	
 checkNext(Dir,Id,Value,PrevId,PrevValue) ->
-	glob:regformat(nextTileToCheck(Dir,PrevId)) ! {yourValue, self()},
+	manager:sendmessage(nextTileToCheck(Dir,PrevId),{yourValue, self()}),
 	moveLoop(Dir,Id,Value,PrevId,PrevValue).
 	
 noMerge(Dir,Id,Value) ->
