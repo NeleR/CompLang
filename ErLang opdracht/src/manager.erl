@@ -5,7 +5,7 @@
 
 -module(manager).
 
--export([manage/0, registerTile/1, sendmessage/2]).
+-export([manage/0, sendmessage/2]).
 
 manage() ->
 	Tmp = [1,2,3,4,5,6,7,9,8,9,10,11,12,13,14,15,16],
@@ -14,7 +14,10 @@ manage() ->
 	manageloop().
 	
 registerTile(TileID) ->
-	T = spawn(tile,tilemain,[TileID]),
+	registerTile(TileID,0,false).
+
+registerTile(TileID,Value,Merged) ->
+	T = spawn(tile,tilemain,[TileID,Value,Merged]),
 	glob:registerName(glob:regformat(TileID), T),
 	debug:debug("MANAGER: register tile ~p at ~p.~n",[TileID,T]).
 
@@ -24,22 +27,26 @@ manageloop() ->
 	receive
 		up ->
 			Tmp = [1,2,3,4],
-			lists:map(fun(X) -> sendmessage(X,up) end,Tmp);
+			lists:map(fun(X) -> sendmessage(X,up) end,Tmp),
+			propagationloop(0,false);
 		dn ->
 			Tmp = [13,14,15,16],
-			lists:map(fun(X) -> sendmessage(X,dn) end, Tmp);
+			lists:map(fun(X) -> sendmessage(X,dn) end, Tmp),
+			propagationloop(0,false);
 		lx ->
 			Tmp = [1,5,9,13],
-			lists:map(fun(X) -> sendmessage(X,lx) end, Tmp);
+			lists:map(fun(X) -> sendmessage(X,lx) end, Tmp),
+			propagationloop(0,false);
 		rx ->
 			Tmp = [4,8,12,16],
-			lists:map(fun(X) -> sendmessage(X,rx) end, Tmp);
+			lists:map(fun(X) -> sendmessage(X,rx) end, Tmp),
+			propagationloop(0,false);
 		sendData ->
 			Basetuple = {0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0},
 			%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 			% this is the instruction mentioned in the text %
 			%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-			timer:sleep(700),
+			%timer:sleep(700),
 			%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 			% this is the instruction mentioned in the text %
 			%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -48,19 +55,29 @@ manageloop() ->
 			spawn( fun() -> broadcaster( 16, {yourValue, collector} ) end);
 		{collectedData, TupleData} ->
 			ListData = randomiseatile(TupleData),
-			gui ! {values, ListData}
-		
-			
+			gui ! {values, ListData};
+		{tileDies, Id,Value,Merged} ->
+			registerTile(Id,Value,Merged)
 	end,
 	manageloop().
 
-propagationloop(Num) ->
+propagationloop(Num,AskedToSend) ->
 	receive
 		endOfPropagation ->
 			case Num of
 				3 -> 
-					 manager ! 
-				_ -> propagationloop(Num+1)
+					if
+						AskedToSend -> manager ! sendData, manageloop();
+						not AskedToSend -> manageloop()
+					end;
+				_ -> 
+					propagationloop(Num+1,AskedToSend)
+			end;
+		{tileDies, Id,Value,Merged} ->
+			registerTile(Id,Value,Merged),
+			propagationloop(Num,AskedToSend);
+		sendData ->
+			propagationloop(Num,true)
 	end.
 
 % takes a tuple of data in input and returns it in a list format
@@ -121,8 +138,8 @@ sendmessage( N, Mess) when N > 0, N < 17 ->
 			ok
 	catch
 		_:F -> 
-			debug:debug("BROADCASTER: cannot commmunicate to ~p. Error ~p.~n",[N,F]),
-			registerTile(N),
+			io:format("BROADCASTER: cannot commmunicate to ~p. A new empty tile is created.~n   Error ~p.~n",[N,F]),
+			registerTile(N,0,false),
 			sendmessage( N, Mess )
 	end.
 	
