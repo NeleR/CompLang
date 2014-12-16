@@ -6,14 +6,13 @@
 -module(tile).
 -import(string, [concat/2]).
 
--export([tilemain/1]).
+-export([tilemain/3]).
 
 tilemain( Id ) ->
-	tilemain(Id, 0).
+	tilemain(Id, 0, false).
 
-tilemain( Id, Value ) ->
-	glob:registerName(glob:regformat(Id), self()),
-	tilelife(Id,Value,false).
+tilemain( Id, Value, Merged ) ->
+	tilelife(Id,Value,Merged).
 
 
 %%%%%%%%%%%%%%%%%
@@ -23,6 +22,7 @@ tilelife(Id,Value,Merged)->
 	receive
 		die ->
 			debug:debug("I, ~p, die.~n",[Id]),
+			manager ! {tileDies, Id,Value,Merged},
 			exit(killed);
 		up ->
 			debug:debug("I, ~p, go up.~n",[Id]),
@@ -70,7 +70,7 @@ propagate(Dir,Id,Value,Merged) ->
 	PropInBounds = inBounds(nextTileToPropagate(Dir,Id)),
 	if 
 		PropInBounds -> manager:sendmessage(nextTileToPropagate(Dir,Id),Dir);
-		not PropInBounds -> manager ! endOfPropagation;
+		not PropInBounds -> manager ! endOfPropagation
 	end,
 	tilelife(Id,Value,Merged).
 
