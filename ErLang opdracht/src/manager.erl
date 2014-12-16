@@ -42,14 +42,7 @@ manageloop() ->
 			lists:map(fun(X) -> sendmessage(X,rx) end, Tmp),
 			propagationloop(0,false);
 		sendData ->
-			Basetuple = {0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0},
-			%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-			% this is the instruction mentioned in the text %
-			%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-			%timer:sleep(700),
-			%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-			% this is the instruction mentioned in the text %
-			%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+			Basetuple = {0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0},			%timer:sleep(700),
 			PidCollector = spawn( fun() -> collect( 0, Basetuple ) end),
 			register( collector, PidCollector ),
 			spawn( fun() -> broadcaster( 16, {yourValue, collector} ) end);
