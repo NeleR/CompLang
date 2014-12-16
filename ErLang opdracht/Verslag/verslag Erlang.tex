@@ -1,0 +1,134 @@
+
+\documentclass{taak}
+
+\usepackage{listings}
+
+\usepackage{color}
+
+\lstset{
+	language=HTML,
+	breaklines=true,
+	showstringspaces=false,
+	tabsize=2,
+}
+
+\usepackage{parskip}
+
+
+\begin{document}
+
+\title{Comparative Programming Languages}
+\subtitle{Erlang assignment: 2048}
+\italic{Master in de Ingenieurswetenschappen}
+\bold{Computerwetenschappen}
+\members{Nele Rober, r0262954}
+\year{2014-2015}
+\code{H0S01a }
+\course{Comparative Porgramming Languages}
+\prof{F. Piessens}
+
+% Titel pagina
+\maketitlepage
+
+% Inhoudsopgaven
+%\setcounter{tocdepth}{2}
+%\tableofcontents
+%\listoftables
+%\listoffigures
+%\newpage 
+
+\section{Tile Behaviour}
+The game of 2048 is represented by 16 tiles. At each moment in time, a tile has an id, a value and a boolean that says whether the tile has merged that turn or not.
+
+A tile can be ordered to move (up, down, left or right). The tile will then do following steps:
+\begin{itemize}
+	\item check whether it is possible to move in that direction;
+	\item check whether it is possible to merge with some next tile;
+	\item perform the right action;
+	\item propagate the order to some next tile.
+\end{itemize}
+
+\section{Failure}
+To represent good tile behaviour, tiles have to contact each other and ask for information. Tiles also have to be contacted by the manager so that it can learn their values or that it can order them to move. Communication with the tiles is thus crucial for this implementation of the game.
+
+If a tile dies, it cannot communicate any longer and the game will crash.
+
+The \texttt{Blaster} function kills tiles once in a while. To make the game work dispite of this \texttt{Blaster}, two solutions have been implemented: one that creates new empty tiles and one that duplicates the tile that just died.
+
+\subsection{Creating new empty tiles}
+Originally, communication with the tiles happend directly. However, this kind of communication can go wrong if the tile is no longer there.
+
+Therefore, a method was created inside \texttt{Manager} to account for the communication with tiles (\texttt{sendmessage(N,Mess)}). This method will send a given message to the given tile. If this tile is unreachable because it has died, an error is thrown. When this happens, a new tile with a value of zero is created and the message is sent again to this new tile.
+
+When all communication with the tiles goes via this method, the game will no longer crash when tiles are killed by the \texttt{Blaster}. However, tiles will randomly seem to disappear to the player as they are recreated with a value of zero.
+
+\subsection{Duplicating existing tiles}
+A better solution is to make the tiles notify the \texttt{Manager} right before they die:
+
+\begin{lstlisting}
+    die ->
+        debug:debug("I, ~p, die.~n",[Id]),
+        manager ! {tileDies, Id,Value,Merged},
+        exit(killed);
+\end{lstlisting}
+
+When the \texttt{Manager} receives this message, he will instantely create a new tile with the same value and merge state:
+
+\begin{lstlisting}
+    {tileDies, Id,Value,Merged} ->
+			registerTile(Id,Value,Merged)
+\end{lstlisting}
+
+This solution makes sure that tiles are always replaced by clones of the dying tiles and that the game can proceed without tiles dissapearing.
+
+\section{Tile Concurrency}
+When the \texttt{Manager} has given the tiles the order to move, it takes some time before the order is propagated through the field. It may happen that the \texttt{GUI} requires information about the new values of the tiles in that waiting period. The \texttt{Manager} should therefore know when it is safe to anwser the request of the \texttt{GUI}.
+
+This is done by letting the tiles send a message to the \texttt{Manager} when propagation is over (when the next tile they should give the order to, lies outside of the playing field).
+
+\begin{lstlisting}
+	propagate(Dir,Id,Value,Merged) ->
+		PropInBounds = inBounds(nextTileToPropagate(Dir,Id)),
+		if 
+			PropInBounds -> manager:sendmessage(nextTileToPropagate(Dir,Id),Dir);
+			not PropInBounds -> manager ! endOfPropagation
+		end,
+		tilelife(Id,Value,Merged).
+\end{lstlisting}
+
+The \texttt{Manager} should receive four of these propagation messages before he can be sure that propagation has truly ended. Therefore, the \texttt{Manager} starts a propagation loop when he sends an order to the tiles:
+
+\begin{lstlisting}
+	propagationloop(Num,AskedToSend) ->
+		receive
+			endOfPropagation ->
+				case Num of
+					3 -> 
+						if
+							AskedToSend -> manager ! sendData, manageloop();
+							not AskedToSend -> manageloop()
+						end;
+					_ -> 
+						propagationloop(Num+1,AskedToSend)
+				end;
+			{tileDies, Id,Value,Merged} ->
+				registerTile(Id,Value,Merged),
+				propagationloop(Num,AskedToSend);
+			sendData ->
+				propagationloop(Num,true)
+		end.
+\end{lstlisting}
+
+This loop keeps track of the number of propagation messages the \texttt{Manager} has received so far (Num). When this number reaches four, the loop is ended and the \texttt{Manager} returns to its normal manage loop.
+
+However, two other kind of messages should not be ignored when the \texttt{Manager} is in this loop: the message that a tile has died - because this is important and should be fixed immediately to avoid strange behaviour of the game - and the message that the \texttt{GUI} requires information about the tile - because otherwise the display will not get updated. In the case of a request from the \texttt{GUI}, the \texttt{Manager} remembers that the \texttt{GUI} has asked for this (AskedToSend) and answers this request as soon as propagation has fully ended. This way, the \texttt{GUI} will not receive incorrect information.
+
+It may also happen that this \texttt{GUI} request comes in when propagation has already finished, in that case there is no problem and the \texttt{Manager} can answer the request immediately.
+
+
+\vspace{1cm}
+\flushright
+\textbf{Total workload for this project: 15u00.}
+
+\end{document}
+
