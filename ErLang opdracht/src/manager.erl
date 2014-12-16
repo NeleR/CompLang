@@ -72,7 +72,7 @@ propagationloop(Num,AskedToSend) ->
 					end;
 				_ -> 
 					propagationloop(Num+1,AskedToSend)
-			end;gi
+			end;
 		{tileDies, Id,Value,Merged} ->
 			registerTile(Id,Value,Merged),
 			propagationloop(Num,AskedToSend);
