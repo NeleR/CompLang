@@ -6,10 +6,10 @@ import Debug
 width = 1024
 height = 768
 
-bottomEdge = height/2
-topEdge = -(height/2)
-leftEdge = -(width/2)
-rightEdge = width/2
+bottomEdge = -(height/2)+playerW
+topEdge = (height/2)-playerW
+leftEdge = -(width/2)+playerW
+rightEdge = (width/2)-playerW
 
 playerW = 64
 playerH = 16
@@ -62,8 +62,8 @@ gameState = foldp step Started keybInput
                         
 initialPlayingState : GameState
 initialPlayingState =
-    let position1 = -(width/2)+50+(playerW)
-    in let position2 = (width/2)-50-(playerW)
+    let position1 = leftEdge+(50-playerW)
+    in let position2 = rightEdge-(50-playerW)
         in let initialPlayer1 = PlayerState (position1,0) E []
             in let initialPlayer2 = PlayerState (position2,0) W []
                 in Playing initialPlayer1 initialPlayer2
@@ -132,19 +132,20 @@ changeYDir d (PlayerState p o t) = if   | d == 1 -> (PlayerState p N t)
 
 proceed : PlayerState -> PlayerState
 proceed (PlayerState (x,y) o t) = case o of
-                            N -> PlayerState (x,(y+1)) o t
-                            S -> PlayerState (x,(y-1)) o t
-                            E -> PlayerState ((x+1),y) o t
-                            W -> PlayerState ((x-1),y) o t
+                            N -> PlayerState (x,(y+1)) o (cutTail ((x,(y+1))::t))
+                            S -> PlayerState (x,(y-1)) o (cutTail ((x,(y-1))::t))
+                            E -> PlayerState ((x+1),y) o (cutTail (((x+1),y)::t))
+                            W -> PlayerState ((x-1),y) o (cutTail (((x-1),y)::t))
+                            
+cutTail : Tail -> Tail
+cutTail t1::t2::t3::t4::t5::t6::t7::t8::t9::t10::t11::t12::t13::t14::t15::t16::t17::t18::t19::t20::tail = t1::t2::t3::t4:t5:t6:t7:t8:t9::t10::t11::t12::t13::t14::t15::t16::t17::t18::t19::t20
                             
 atBorder : PlayerState -> Bool
-atBorder (PlayerState (x,y) o t) = if   | x > width/2 -> True
-                                        | x < -(width/2) -> True
-                                        | y > height/2 -> True
-                                        | y < -(height/2) -> True
+atBorder (PlayerState (x,y) o t) = if   | x > rightEdge && o == E -> True
+                                        | x < leftEdge && o == W -> True
+                                        | y > topEdge && o == N -> True
+                                        | y < bottomEdge && o == S -> True
                                         | otherwise -> False
-                    
-
                     
 -- playing field: widthxheight, black => floats, not ints!
 -- game start: plainText "Press space to start a new game"
