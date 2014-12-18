@@ -1,3 +1,8 @@
+---------------------------------------------------------------------
+-- Elm Assignment, Comparative Programming Languages (2014-2015)
+-- Nele Rober, r0262954
+---------------------------------------------------------------------
+
 import Color
 import Keyboard
 import Debug
@@ -76,8 +81,8 @@ showPlayingState (PlayerState (x1,y1) o1 t1) (PlayerState (x2,y2) o2 t2)
                             filled black (rect width height), -- playing field
                             showPlayer color1 (x1, y1) o1, -- player 1
                             showPlayer color2 (x2, y2) o2, -- player 2
-                            showTail color1 t1, -- tail player 1
-                            showTail color2 t2 -- tail player 2
+                            showTail color1 (tail t1), -- tail player 1
+                            showTail color2 (tail t2) -- tail player 2
                             ]
 
 heartbeat : Signal Time
@@ -119,26 +124,37 @@ step (KeybInput x2 y2 x1 y1 space) state
 collision : PlayerState -> PlayerState -> Bool
 collision (PlayerState p1 o1 t1) (PlayerState p2 o2 t2)
     = if    | isEmpty t2 -> False
-            | isInCycle p1 o1 (head t2) -> True
+            | isInCycle (head t2) p1 o1 -> True
             | otherwise -> collision (PlayerState p1 o1 t1) (PlayerState p2 o2 (tail t2))
-            
-isInCycle : Position -> Orientation -> Position -> Bool
-isInCycle (x1,y1) o1 (x2,y2)
-    = case o1 of
-            N -> if | x2==x1 && y2==y1 -> True
-                    | otherwise -> False
-            E -> if | x2==x1 && y2==y1 -> True
-                    | otherwise -> False
-            S -> if | x2==x1
-                        && y2<=(y1) && y2>=(y1-playerH) -> True
-                    | otherwise -> False
-            W -> if | x2==x1 && y2==y1 -> True
-                    | otherwise -> False
 
+-- checks whether the given point (the first arg) lies within the light cycle of the player on the given position (the second arg) and with the given orientation (the third arg)
+-- example use: isInCycle (0,0) (5,0) W -> True
+isInCycle : Position -> Position -> Orientation -> Bool
+isInCycle (x2,y2) (x1,y1) o1
+    = case o1 of
+            N -> if | x2<=(x1+(playerH/2)) && x2>=(x1-(playerH/2)) &&
+                        y2<=(y1+playerW) && y2>=(y1) -> True
+                    | otherwise -> False
+            E -> if | x2<=(x1+playerW) && x2>=(x1) &&
+                        y2<=(y1+(playerH/2)) && y2>=(y1-(playerH/2)) -> True
+                    | otherwise -> False
+            S -> if | x2<=(x1+(playerH/2)) && x2>=(x1-(playerH/2)) &&
+                        y2<=(y1) && y2>=(y1-playerW) -> True
+                    | otherwise -> False
+            W -> if | x2<=(x1) && x2>=(x1-playerW) &&
+                        y2<=(y1+(playerH/2)) && y2>=(y1-(playerH/2)) -> True
+                    | otherwise -> False
+                    
+-- moves a player one step forward and turning if necessary
+-- example use: movePlayer -1 0 (PlayerState (x,y) o t) -> the player will turn WEST and go one step forward in its new direction; the tail will proceed as well
 movePlayer : Int -> Int -> PlayerState -> PlayerState
 movePlayer dx dy player
     = proceed (changeDir dx dy player)
           
+-- makes the direction of a player change appropriately
+-- dx: whether the player turns in the x direction (value of a or d or left or right arrows)
+-- dy: whether the player turns in the x direction (value of w or s or up or right down)
+-- example use: changeDir -1 0 (PlayerState (x,y) o t) -> the player will turn WEST
 changeDir : Int -> Int -> PlayerState -> PlayerState
 changeDir dx dy (PlayerState p o t) 
     = case dx of
@@ -149,6 +165,9 @@ changeDir dx dy (PlayerState p o t)
             (-1) -> (PlayerState p S t)
             0 -> (PlayerState p o t)
 
+-- makes the player proceed one step, in the appropriate direction
+-- a new point is added to the tail and the last point of the tail is taken away
+-- example use: proceed (PlayerState (0,0) N [0,-1]) -> (PlayerState (0,1) N [0,0]) -> 
 proceed : PlayerState -> PlayerState
 proceed (PlayerState (x,y) o t)
     = case o of
@@ -156,7 +175,9 @@ proceed (PlayerState (x,y) o t)
         S -> PlayerState (x,(y-1)) o (take tailLength ((x,y)::t))
         E -> PlayerState ((x+1),y) o (take tailLength ((x,y)::t))
         W -> PlayerState ((x-1),y) o (take tailLength ((x,y)::t))
-                            
+                        
+-- decides whether a player is hitting the border
+-- example use: atBorder (PlayerState (520,0) E []) -> True
 atBorder : PlayerState -> Bool
 atBorder (PlayerState (x,y) o t)
     = if    | x > rightEdge && o == E -> True
@@ -164,16 +185,3 @@ atBorder (PlayerState (x,y) o t)
             | y > topEdge && o == N -> True
             | y < bottomEdge && o == S -> True
             | otherwise -> False
-                    
--- playing field: widthxheight, black => floats, not ints!
--- game start: plainText "Press space to start a new game"
--- restart game by space
--- game end: "Player _ has won!"
--- player start 50 pixel from edge, towards center
--- 50 pixels per second
--- steering: arrows and wasd
--- draai instantanious
--- collision: de dozen mogen raken, de staarten niet
--- tail: vraagt een lijst van segmentpunten
--- locatie: staart start op het einde van de cycle
--- lengte staart: ongeveer gelijk maken als voorbeeld
