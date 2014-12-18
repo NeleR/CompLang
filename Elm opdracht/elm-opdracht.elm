@@ -15,6 +15,7 @@ playerW = 64
 playerH = 16
 
 tailWidth = 2
+tailLength = 250
 
 color1 = Color.lightBlue -- starts left
 color2 = Color.orange -- starts right
@@ -23,11 +24,13 @@ type Position = (Float,Float)
 type Tail = [(Float, Float)]
 data Orientation = N | E | S | W
 
-data PlayerState = PlayerState Position Orientation Tail
-data GameState = Playing PlayerState PlayerState
-               | Ended Int | Started
+data PlayerState
+    = PlayerState Position Orientation Tail
+data GameState
+    = Playing PlayerState PlayerState | Ended Int | Started
                
-data KeybInput = KeybInput Int Int Int Int Bool
+data KeybInput
+    = KeybInput Int Int Int Int Bool
 
 -- example use: showPlayer Color.lightBlue (10, 10) N
 showPlayer : Color -> Position -> Orientation -> Form
@@ -43,7 +46,6 @@ showPlayer color (x,y) o =
         |> move (x, y)
         |> move (xOffset, yOffset)
         |> rotate (degrees degs) 
-
 
 -- example use: showTail Color.lightBlue [(10, 10), (20, 10)]
 showTail : Color -> Tail -> Form
@@ -70,13 +72,13 @@ initialPlayingState =
 
 showPlayingState : PlayerState -> PlayerState -> Element
 showPlayingState (PlayerState (x1,y1) o1 t1) (PlayerState (x2,y2) o2 t2)
-       = collage width height   [
-                                filled black (rect width height), -- playing field
-                                showPlayer color1 (x1, y1) o1, -- player 1
-                                showPlayer color2 (x2, y2) o2, -- player 2
-                                showTail color1 t1, -- tail player 1
-                                showTail color2 t2 -- tail player 2
-                                ]
+    = collage width height  [
+                            filled black (rect width height), -- playing field
+                            showPlayer color1 (x1, y1) o1, -- player 1
+                            showPlayer color2 (x2, y2) o2, -- player 2
+                            showTail color1 t1, -- tail player 1
+                            showTail color2 t2 -- tail player 2
+                            ]
 
 heartbeat : Signal Time
 heartbeat = every (second/100)
@@ -92,8 +94,12 @@ showState : GameState -> Element
 showState state
     = case state of
             Started -> plainText "Press space to start a new game"
-            Ended winner -> beside (plainText ("Player ")) (beside (asText (winner)) (plainText (" has won")))
+            Ended winner -> showEnd winner
             Playing player1 player2 -> showPlayingState player1 player2
+            
+showEnd : Int -> Element
+showEnd winner
+    = beside (plainText ("Player ")) (beside (asText (winner)) (plainText (" has won")))
                         
 step : KeybInput -> GameState -> GameState
 step (KeybInput x2 y2 x1 y1 space) state
@@ -104,48 +110,60 @@ step (KeybInput x2 y2 x1 y1 space) state
                 if  | space -> initialPlayingState
                     | atBorder player1 -> Ended 2
                     | atBorder player2 -> Ended 1
-                    | otherwise -> 
-                        case x1 of
-                            0 -> case y1 of
-                                0 -> case x2 of
-                                    0 -> case y2 of
-                                        0 -> Playing (proceed player1) (proceed player2)
-                                        otherwise -> Playing (proceed player1) (changeYDir y2 (proceed player2))
-                                    otherwise -> Playing (proceed player1) (changeXDir x2 (proceed player2))
-                                otherwise -> Playing (changeYDir y1 (proceed player1)) (proceed player2)
-                            otherwise -> Playing (changeXDir x1 (proceed player1)) (proceed player2)
-                -- crossing player1 player2 -> Ended 1
-                    -- crossing player2 player1 -> Ended 2
-                   -- else Playing (proceed player1) (proceed player2)
-          
-changeXDir : Int -> PlayerState -> PlayerState
-changeXDir d (PlayerState p o t) = if   | d == 1 -> (PlayerState p E t)
-                                        | d == (-1) -> (PlayerState p W t)
-                                        | otherwise -> (PlayerState p o t)
--- change tail!
+                    | collision player1 player2 -> Ended 2
+                    | collision player1 player1 -> Ended 2
+                    | collision player2 player1 -> Ended 1
+                    | collision player2 player2 -> Ended 1
+                    | otherwise -> Playing (movePlayer x1 y1 player1) (movePlayer x2 y2 player2)
 
-changeYDir : Int -> PlayerState -> PlayerState
-changeYDir d (PlayerState p o t) = if   | d == 1 -> (PlayerState p N t)
-                                        | d == -1 -> (PlayerState p S t)
-                                        | otherwise -> (PlayerState p o t)
--- change tail!
+collision : PlayerState -> PlayerState -> Bool
+collision (PlayerState p1 o1 t1) (PlayerState p2 o2 t2)
+    = if    | isEmpty t2 -> False
+            | isInCycle p1 o1 (head t2) -> True
+            | otherwise -> collision (PlayerState p1 o1 t1) (PlayerState p2 o2 (tail t2))
+            
+isInCycle : Position -> Orientation -> Position -> Bool
+isInCycle (x1,y1) o1 (x2,y2)
+    = case o1 of
+            N -> if | x2==x1 && y2==y1 -> True
+                    | otherwise -> False
+            E -> if | x2==x1 && y2==y1 -> True
+                    | otherwise -> False
+            S -> if | x2==x1
+                        && y2<=(y1) && y2>=(y1-playerH) -> True
+                    | otherwise -> False
+            W -> if | x2==x1 && y2==y1 -> True
+                    | otherwise -> False
+
+movePlayer : Int -> Int -> PlayerState -> PlayerState
+movePlayer dx dy player
+    = proceed (changeDir dx dy player)
+          
+changeDir : Int -> Int -> PlayerState -> PlayerState
+changeDir dx dy (PlayerState p o t) 
+    = case dx of
+        1 -> (PlayerState p E t)
+        (-1) -> (PlayerState p W t)
+        0 -> case dy of
+            1 -> (PlayerState p N t)
+            (-1) -> (PlayerState p S t)
+            0 -> (PlayerState p o t)
 
 proceed : PlayerState -> PlayerState
-proceed (PlayerState (x,y) o t) = case o of
-                            N -> PlayerState (x,(y+1)) o (cutTail ((x,(y+1))::t))
-                            S -> PlayerState (x,(y-1)) o (cutTail ((x,(y-1))::t))
-                            E -> PlayerState ((x+1),y) o (cutTail (((x+1),y)::t))
-                            W -> PlayerState ((x-1),y) o (cutTail (((x-1),y)::t))
-                            
-cutTail : Tail -> Tail
-cutTail t1::t2::t3::t4::t5::t6::t7::t8::t9::t10::t11::t12::t13::t14::t15::t16::t17::t18::t19::t20::tail = t1::t2::t3::t4:t5:t6:t7:t8:t9::t10::t11::t12::t13::t14::t15::t16::t17::t18::t19::t20
+proceed (PlayerState (x,y) o t)
+    = case o of
+        N -> PlayerState (x,(y+1)) o (take tailLength ((x,y)::t))
+        S -> PlayerState (x,(y-1)) o (take tailLength ((x,y)::t))
+        E -> PlayerState ((x+1),y) o (take tailLength ((x,y)::t))
+        W -> PlayerState ((x-1),y) o (take tailLength ((x,y)::t))
                             
 atBorder : PlayerState -> Bool
-atBorder (PlayerState (x,y) o t) = if   | x > rightEdge && o == E -> True
-                                        | x < leftEdge && o == W -> True
-                                        | y > topEdge && o == N -> True
-                                        | y < bottomEdge && o == S -> True
-                                        | otherwise -> False
+atBorder (PlayerState (x,y) o t)
+    = if    | x > rightEdge && o == E -> True
+            | x < leftEdge && o == W -> True
+            | y > topEdge && o == N -> True
+            | y < bottomEdge && o == S -> True
+            | otherwise -> False
                     
 -- playing field: widthxheight, black => floats, not ints!
 -- game start: plainText "Press space to start a new game"
