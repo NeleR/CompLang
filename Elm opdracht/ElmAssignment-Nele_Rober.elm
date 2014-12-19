@@ -1,6 +1,7 @@
 ---------------------------------------------------------------------
 -- Elm Assignment - Comparative Programming Languages (2014-2015)  --
 -- Nele Rober, r0262954                                            -- 
+-- total workload for this project: 15:00                          --
 ---------------------------------------------------------------------
 
 {- imports -}

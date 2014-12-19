@@ -2,3 +2,10 @@
 Elm\ opdracht/build
 Elm\ opdracht/cache
 
+
+#Latex
+build
+.toc
+.log
+.syntex.gz
+
